@@ -1,51 +1,108 @@
+function uuid() {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+    var r = (Math.random() * 16) | 0,
+      v = c == "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export class Quote {
-  getId () {    // UUID
+  _id: string;
+  _symbol: string;
+  _price: number;
+  _availableVolume: number;
+  _expiration: string;
+
+  constructor(symbol, price, availableVolume, expiration) {
+    this._id = uuid();
+    this._symbol = symbol;
+    this._price = price;
+    this._availableVolume = availableVolume;
+    this._expiration = expiration;
   }
 
-  setId (id) {
+  getId() {
+    // UUID
+    return this._id;
   }
 
-  setSymbol (symbol) {  // string
+  setId(id) {
+    this._id = id;
   }
 
-  getSymbol () {
+  setSymbol(symbol) {
+    // string
+    this._symbol = symbol;
   }
 
-  setPrice (price) {    // currency numeric type
+  getSymbol() {
+    return this._symbol;
   }
 
-  getPrice () {
+  setPrice(price) {
+    // currency numeric type
+    this._price = price;
   }
 
-  setAvailableVolume (volume) { //int
+  getPrice() {
+    return this._price;
   }
 
-  getAvailableVolume () {
+  setAvailableVolume(volume) {
+    //int
+    this._availableVolume = volume;
   }
 
-  setExpiration (expiration) {
+  getAvailableVolume() {
+    return this._availableVolume;
   }
 
-  getExpiration () {    // date
+  setExpiration(expiration) {
+    this._expiration = expiration;
+  }
+
+  getExpiration() {
+    // date
+    return this._expiration;
   }
 }
 
 export class TradeResult {
-  setId (id) {
+  _id: string;
+  _avgPrice: number;
+  _symbol: string;
+  _volume: number;
+
+  constructor(symbol, avgPrice, volume) {
+    this._id = uuid();
+    this._symbol = symbol;
+    this._avgPrice = avgPrice;
+    this._volume = volume;
   }
-  getId () {
+
+  setId(id) {
+    this._id = id;
   }
-  setSymbol (symbol) {
+  getId() {
+    return this._id;
   }
-  getSymbol () {
+  setSymbol(symbol) {
+    this._symbol = symbol;
   }
-  setVolumeWeightedAveragePrice (avgPrice) {
+  getSymbol() {
+    return this._symbol;
   }
-  getVolumeWeightedAveragePrice () {
+  setVolumeWeightedAveragePrice(avgPrice) {
+    this._avgPrice = avgPrice;
   }
-  setVolumeRequested (volume) {
+  getVolumeWeightedAveragePrice() {
+    return this._avgPrice;
   }
-  getVolumeRequested () {
+  setVolumeRequested(volume) {
+    this._volume = volume;
+  }
+  getVolumeRequested() {
+    return this._volume;
   }
 }
 
@@ -57,29 +114,54 @@ export class TradeResult {
 //
 // Efficiency counts think about what data structures you use and how each method will perform.
 //
-// Though not required, feel free to includes any notes on any areas of this interface that you would improve, or which you
+// Though not required, feel free to include any notes on any areas of this interface that you would improve, or which you
 // feel don't adhere to good design concepts or implementation practices.
 export class QuoteManager {
+  _quotes: Record<string, Quote> = {};
+
+  constructor() {
+    this._quotes = {};
   }
 
   // Add or update the quote (specified by Id) in symbol's book.
   // If quote is new or no longer in the book, add it. Otherwise update it to match the given price, volume, and symbol.
-  addOrUpdateQuote (quote) {
+  addOrUpdateQuote(quote) {
+    this._quotes = { ...this._quotes, [quote.getId()]: quote };
   }
 
   // Remove quote by Id, if quote is no longer in symbol's book do nothing.
-  removeQuote (id) {
+  removeQuote(id) {
+    const { [id]: quote, ...trimmedQuotes } = this._quotes;
+    this._quotes = trimmedQuotes;
   }
 
   // Remove all quotes on the specifed symbol's book.
-  removeAllQuotes (symbol) {
+  removeAllQuotes(symbol) {
+    const quoteKeys = Object.keys(this._quotes);
+    const trimmedQuotes = quoteKeys.reduce((acc, quoteKey) => {
+      if (symbol !== this._quotes[quoteKey].getSymbol()) {
+        return { ...acc, [quoteKey]: this._quotes[quoteKey] };
+      }
+    }, {});
+    this._quotes = trimmedQuotes;
   }
 
   // Get the best (i.e. lowest) price in the symbol's book that still has available volume.
   // If there is no quote on the symbol's book with available volume, return null.
   // Otherwise return a Quote object with all the fields set.
   // Don't return any quote which is past its expiration time, or has been removed.
-  getBestQuoteWithAvailableVolume (symbol) {
+  getBestQuoteWithAvailableVolume(symbol) {
+    const quoteKeys = Object.keys(this._quotes);
+    const quote = quoteKeys.reduce((acc, quoteKey) => {
+      if (
+        symbol === this._quotes[quoteKey].getSymbol() &&
+        this._quotes[quoteKey].getAvailableVolume() > 0 &&
+        new Date(this._quotes[quoteKey].getExpiration()) > new Date()
+      ) {
+        return this._quotes[quoteKey];
+      }
+    }, {});
+    return quote || null;
   }
 
   // Request that a trade be executed. For the purposes of this interface, assume that the trade is a request to BUY, not sell. Do not trade an expired quotes.
@@ -95,6 +177,5 @@ export class QuoteManager {
   // And After calling this a second time for 500 volume, the quotes are:
   //   {Price: 1.0, Volume: 1,000, AvailableVolume: 0}
   //   {Price: 2.0, Volume: 1,000, AvailableVolume: 750}
-  executeTrade (symbol, volumeRequested) {
-  }
+  executeTrade(symbol, volumeRequested) {}
 }
