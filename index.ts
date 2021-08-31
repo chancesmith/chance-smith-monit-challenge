@@ -117,32 +117,29 @@ export class TradeResult {
 // Though not required, feel free to include any notes on any areas of this interface that you would improve, or which you
 // feel don't adhere to good design concepts or implementation practices.
 export class QuoteManager {
-  _quotes: Record<string, Quote> = {};
+  _quotes: Quote[];
 
   constructor() {
-    this._quotes = {};
+    this._quotes = [];
   }
 
   // Add or update the quote (specified by Id) in symbol's book.
   // If quote is new or no longer in the book, add it. Otherwise update it to match the given price, volume, and symbol.
   addOrUpdateQuote(quote) {
-    this._quotes = { ...this._quotes, [quote.getId()]: quote };
+    this._quotes = [...this._quotes, quote];
   }
 
   // Remove quote by Id, if quote is no longer in symbol's book do nothing.
   removeQuote(id) {
-    const { [id]: quote, ...trimmedQuotes } = this._quotes;
+    const trimmedQuotes = this._quotes.filter((quote) => quote.getId() !== id);
     this._quotes = trimmedQuotes;
   }
 
   // Remove all quotes on the specifed symbol's book.
   removeAllQuotes(symbol) {
-    const quoteKeys = Object.keys(this._quotes);
-    const trimmedQuotes = quoteKeys.reduce((acc, quoteKey) => {
-      if (symbol !== this._quotes[quoteKey].getSymbol()) {
-        return { ...acc, [quoteKey]: this._quotes[quoteKey] };
-      }
-    }, {});
+    const trimmedQuotes = this._quotes.filter(
+      (quote) => quote.getSymbol() !== symbol
+    );
     this._quotes = trimmedQuotes;
   }
 
@@ -151,17 +148,14 @@ export class QuoteManager {
   // Otherwise return a Quote object with all the fields set.
   // Don't return any quote which is past its expiration time, or has been removed.
   getBestQuoteWithAvailableVolume(symbol) {
-    const quoteKeys = Object.keys(this._quotes);
-    const quote = quoteKeys.reduce((acc, quoteKey) => {
-      if (
-        symbol === this._quotes[quoteKey].getSymbol() &&
-        this._quotes[quoteKey].getAvailableVolume() > 0 &&
-        new Date(this._quotes[quoteKey].getExpiration()) > new Date()
-      ) {
-        return this._quotes[quoteKey];
-      }
-    }, {});
-    return quote || null;
+    const qouteFound = this._quotes.find((quote) => {
+      return (
+        quote.getSymbol() === symbol &&
+        quote.getAvailableVolume() > 0 &&
+        new Date(quote.getExpiration()) > new Date()
+      );
+    });
+    return qouteFound || null;
   }
 
   // Request that a trade be executed. For the purposes of this interface, assume that the trade is a request to BUY, not sell. Do not trade an expired quotes.
@@ -177,5 +171,26 @@ export class QuoteManager {
   // And After calling this a second time for 500 volume, the quotes are:
   //   {Price: 1.0, Volume: 1,000, AvailableVolume: 0}
   //   {Price: 2.0, Volume: 1,000, AvailableVolume: 750}
-  executeTrade(symbol, volumeRequested) {}
+  executeTrade(symbol, volumeRequested) {
+    let totalVolumedUsed = 0;
+    while (totalVolumedUsed !== volumeRequested) {
+      const quote = this.getBestQuoteWithAvailableVolume(symbol);
+      if (quote) {
+        const tradeResult = new TradeResult(
+          quote.getSymbol(),
+          quote.getPrice(),
+          volumeRequested
+        );
+        const volumeUsed = Math.min(
+          volumeRequested,
+          quote.getAvailableVolume()
+        );
+        quote.setAvailableVolume(quote.getAvailableVolume() - volumeUsed);
+        tradeResult.setVolumeRequested(volumeUsed);
+        totalVolumedUsed += volumeUsed;
+      } else {
+        return null;
+      }
+    }
+  }
 }
